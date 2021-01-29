@@ -1,0 +1,240 @@
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} repl
+Função que simula um REPL em ADVPL
+Os comandos são digitamos diretamente no appserver, assim como os resultados
+
+@obs Existe um bug quando usado CTRL+C na função ConIn em loop, o binário passa a enviar ENTER pra ela mesmo sem a interação do usuário
+
+@sample u_repl()
+@author Daniel Mendes
+@since Jan 28, 2021
+@version 1.0
+/*/
+//-------------------------------------------------------------------
+user function repl()
+// TODO: Verificar o bug do CTRL+C no appserver
+// qOut("Nao utilize de CTRL+C dentro do REPL, existe um bug que a funcao ConIn recebe um ENTER sem qualquer interecao com o teclado")
+ConOut("", "", "ADVPL REPL - Para sair utilize o comando 'exit()'", "")
+loopEval()
+return
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} loopEval
+Efetua o loop do REPL, pedindo os valores no console e executando
+via macro os mesmos
+
+@author Daniel Mendes
+@since Jan 28, 2021
+@version 1.0
+@protected
+/*/
+//-------------------------------------------------------------------
+static function loopEval()
+local cInstruction as char
+local lLoop as logical
+local lError as logical
+local bError as block
+
+lLoop := .T.
+
+//A avalidação dos valores deve ficar dentro do loop e da mesma função,
+//caso contrário, a criação de variáveis não funciona
+while lLoop
+    cInstruction := read(@lLoop)
+
+    if lLoop
+        lError := .F.
+        bError := ErrorBlock({|oError| lError := .T., xEval := oError:description, Break(oError)})
+
+        begin sequence
+            xEval := &(cInstruction)
+        end sequence
+
+        ErrorBlock(bError)
+        bError := nil
+        print(xEval, lError, cInstruction)
+    endif
+enddo
+
+return
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} read
+Efetua a leitura dos dados no console, verificando também se trata
+do comando de saída do REPL
+
+@param lLoop Indica se o REPL deve ser encerrado [Referência]
+
+@return cInstruction Instrução ADVPL que será executada
+
+@author Daniel Mendes
+@since Jan 28, 2021
+@version 1.0
+@protected
+/*/
+//-------------------------------------------------------------------
+static function read(lLoop as logical)
+local cInstruction as char
+
+// TODO: Tentar deixar algo a esquerda para representar a espera da entrada de dados
+// ConOut(">>>") // Não é possível escrever algo a esquerda do ConIn
+cInstruction := ConIn()
+lLoop := loopContinues(cInstruction)
+
+return cInstruction
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} loopContinues
+Verifica se a instrução digitada trata-se da função exit, função
+que encerra o REPL
+
+@return cInstruction Instrução ADVPL que será avaliada
+
+@return Boolean, indica se o REPL deve continuar o loop
+
+@author Daniel Mendes
+@since Jan 28, 2021
+@version 1.0
+@protected
+/*/
+//-------------------------------------------------------------------
+static function loopContinues(cInstruction as char)
+return !Lower(AllTrim(cInstruction)) == "exit()"
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} print
+Efetua a impressão das expressões ADVPL recebidas
+
+@param xValue Valor gerado após a macro das instruções ADVPL
+@param lError Indica se a instrução gerou exceção
+@param cInstruction Instrução ADVPL, usada para avaliar a quebra de linha [Apenas o ENTER]
+
+@author Daniel Mendes
+@since Jan 28, 2021
+@version 1.0
+@protected
+/*/
+//-------------------------------------------------------------------
+static function print(xValue, lError as logical, cInstruction as char)
+if lError
+    ConErr(getStringValue(xValue, .T.)+Chr(10))
+else
+    //Caso não seja apenas o pressionar do ENTER sem instrução, o resultado da avaliação será exibido no console
+    if !(xValue == nil .and. cInstruction == "")
+        ConOut(getStringValue(xValue, .F.))
+    endif
+endif
+
+return
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} getStringValue
+Transforma qualquer valor recebido em uma string para exibição no REPL
+
+@param xValue Valor gerado após a macro das instruções ADVPL
+@param lNil Indica que o valor nil, deve ser impresso exatamente dessa forma
+
+@return cValue Representação em string do valor ADVPL recebido
+
+@obs O parâmetro lNil foi criado para ser utilizado na impressão do array, pois ficou bem feio :P
+
+@author Daniel Mendes
+@since Jan 28, 2021
+@version 1.0
+@protected
+/*/
+//-------------------------------------------------------------------
+static function getStringValue(xValue, lNil as logical)
+local cType as char
+local cValue as char
+
+cType := ValType(xValue)
+
+if cType == "N"
+    cValue := cValToChar(xValue)
+elseif cType == "D"
+    cValue := DtoC(xValue)
+elseif cType == "L"
+    cValue := Iif(xValue, ".T.", ".F.")
+elseif cType == "B"
+    cValue := GetCBSource(xValue)
+elseif cType == "J"
+    cValue := xValue:toJson()
+elseif cType == "O"
+    cValue := "<type='object' class='" + GetClassName(xValue) + "'>"
+elseif cType == "C"
+    cValue := xValue
+elseif cType == "U"
+    cValue := Iif(lNil, "nil", "<type='undefined'>")
+elseif cType == "A"
+    cValue := getArrayValue(xValue)
+else
+    cValue := undefined(xValue, cType)
+endif
+
+return cValue
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} getArrayValue
+Converte o array recebido em string
+
+@param aValues Array de valores
+
+@return cValues Array convertido para string, mantendo a sintaxe ADVPL, com chaves
+
+@author Daniel Mendes
+@since Jan 28, 2021
+@version 1.0
+@protected
+/*/
+//-------------------------------------------------------------------
+static function getArrayValue(aValues as array)
+local cValues as char
+local nI as numeric
+
+if Empty(aValues)
+    cValues := "{}"
+else
+    cValues := "{"
+
+    for nI := 1 to Len(aValues)
+        cValues += getStringValue(aValues[nI], .T.) + ","
+    next
+
+    cValues := Left(cValues, Len(cValues)-1) + "}"
+endif
+
+return cValues
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} undefined
+Tenta converter o valor recebido em string, caso não seja dos tipos
+conhecidos
+
+@param xValue Valor gerado após a macro das instruções ADVPL
+@param cType Tipo de dado recebido
+
+@return cValue Valor recebido convertido em string
+
+@obs Essa função é para casos desconhecidos ou evolução da linguagem, novos tipos etc
+
+@author Daniel Mendes
+@since Jan 28, 2021
+@version 1.0
+@protected
+/*/
+//-------------------------------------------------------------------
+static function undefined(xValue, cType as char)
+local bError as block
+local cValue as char
+
+bError := ErrorBlock({|oError| cValue := "<type='" + cType + "'>", Break(oError)})
+
+begin sequence
+    cValue := cValToChar(xValue)
+end sequence
+
+ErrorBlock(bError)
+
+return cValue
