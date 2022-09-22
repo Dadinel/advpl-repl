@@ -31,10 +31,10 @@ via macro os mesmos
 /*/
 //-------------------------------------------------------------------
 static function loopEval()
-local cInstruction as char
+local cInstruction as character
 local lLoop as logical
 local lError as logical
-local bError as block
+local bError as codeblock
 
 lLoop := .T.
 
@@ -74,8 +74,8 @@ do comando de saída do REPL
 @protected
 /*/
 //-------------------------------------------------------------------
-static function read(lLoop as logical)
-local cInstruction as char
+static function read(lLoop as logical) as character
+local cInstruction as character
 
 // TODO: Tentar deixar algo a esquerda para representar a espera da entrada de dados
 // ConOut(">>>") // Não é possível escrever algo a esquerda do ConIn
@@ -99,7 +99,7 @@ que encerra o REPL
 @protected
 /*/
 //-------------------------------------------------------------------
-static function loopContinues(cInstruction as char)
+static function loopContinues(cInstruction as character) as logical
 return !Lower(AllTrim(cInstruction)) == "exit()"
 
 //-------------------------------------------------------------------
@@ -116,7 +116,7 @@ Efetua a impressão das expressões ADVPL recebidas
 @protected
 /*/
 //-------------------------------------------------------------------
-static function print(xValue, lError as logical, cInstruction as char)
+static function print(xValue, lError as logical, cInstruction as character)
 if lError
     ConErr(getStringValue(xValue, .T.)+Chr(10))
 else
@@ -146,8 +146,8 @@ Transforma qualquer valor recebido em uma string para exibição no REPL
 /*/
 //-------------------------------------------------------------------
 static function getStringValue(xValue, lNil as logical)
-local cType as char
-local cValue as char
+local cType as character
+local cValue as character
 
 cType := ValType(xValue)
 
@@ -189,8 +189,8 @@ Converte o array recebido em string
 @protected
 /*/
 //-------------------------------------------------------------------
-static function getArrayValue(aValues as array)
-local cValues as char
+static function getArrayValue(aValues as array) as character
+local cValues as character
 local nI as numeric
 
 if Empty(aValues)
@@ -225,9 +225,9 @@ conhecidos
 @protected
 /*/
 //-------------------------------------------------------------------
-static function undefined(xValue, cType as char)
-local bError as block
-local cValue as char
+static function undefined(xValue as variant, cType as character) as character
+local bError as codeblock
+local cValue as character
 
 bError := ErrorBlock({|oError| cValue := "<type='" + cType + "'>", Break(oError)})
 
